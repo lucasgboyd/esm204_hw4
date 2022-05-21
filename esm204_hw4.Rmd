@@ -1,0 +1,206 @@
+---
+title: "ESM 204 - HW4"
+author: "Lucas Boyd"
+date: "5/16/2022"
+output: 
+  html_document:
+    code_folding: hide
+    theme: spacelab
+---
+
+# Uncertainty and the Social Cost of Carbon {.tabset .tabset-pills}
+
+![](biden.jpeg)
+
+```{r setup, include= TRUE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(here)
+library(broom)
+library(patchwork)
+```
+
+```{r}
+# reading in damages data, creating new column for squared damages
+damages <- read_csv(here("damages.csv")) %>% 
+  mutate(warming_q = warming^2)
+
+# reading in warming data
+warming <- read_csv(here("warming.csv"))
+```
+
+## 1.Quadratic model
+
+```{r}
+# creating a quadratic model
+qm_damages <- lm(damages ~ 0 + warming + warming_q, data = damages)
+damages_predict <- augment(qm_damages)
+
+# visualizing the model 
+ggplot(data = damages, aes(x = warming, y = damages/1e+12)) +
+  geom_point(color = "black", size = 0.7) +
+  geom_line(data = damages_predict, aes(x = warming, y = .fitted/1e+12, color = .fitted), size = 1.2) +
+  scale_color_gradientn(colors = c("gold", "firebrick", "darkred")) +
+  theme_minimal(14) +
+  labs(x = "Warming (degrees C)", y = "Damages (trillions USD)") +
+  scale_x_continuous(n.breaks = 10) +
+  theme(legend.position = "none")
+```
+
+**Figure 1** shows the damages in trillions of US dollars from climate change that correspond to levels of global warming (degrees C). The line represents a quadratic model fitted to the data.
+
+------------------------------------------------------------------------
+
+## 2. The pulse
+
+```{r}
+# storing a function for damages from warming based on the quadratic model
+damages <- function(warming) {
+  damages <- qm_damages$coefficients[1]*warming + qm_damages$coefficients[2]*(warming^2)
+  return(damages)
+}
+
+# creating a new dataframe with differences and damages per ton based on degrees of warming 
+pulse <- warming %>% 
+  mutate(damages_baseline = damages(warming_baseline)) %>% 
+  mutate(damages_pulse = damages(warming_pulse)) %>% 
+  mutate(difference = damages_pulse - damages_baseline) %>% 
+  mutate(damage_per_ton = difference/35e+9)
+
+# plotting
+p1 <- ggplot(data = pulse, aes(x = year, y = damages_baseline/1e+12)) +
+  geom_line(size = 1.2, color = "darkred") +
+  labs(x = "Year", y = "Damages (trillions USD)", title = "DAMAGES UNDER BASELINE") +
+  theme_minimal(14) +
+  theme(plot.title = element_text(hjust = 0.48, face = "bold"))
+
+p2 <- ggplot(data = pulse, aes(x = year, y = damages_pulse/1e+12)) +
+  geom_line(size = 1.2, color = "darkred") +
+  labs(x = "Year", y = "Damages (trillions USD)", title = "DAMAGES WITH PULSE") +
+  theme_minimal(14) +
+  theme(plot.title = element_text(hjust = 0.48, face = "bold"))
+
+p3 <- ggplot(data = pulse, aes(x = year, y = difference/1e+09)) +
+  geom_line(size = 1.2, color = "darkred") +
+  labs(x = "Year", y = "Damages (billions USD)", title = "ADDITIONAL DAMAGES FROM PULSE") +
+  theme_minimal(14) +
+  theme(plot.title = element_text(hjust = 0.48, face = "bold"))
+
+p4 <- ggplot(data = pulse, aes(x = year, y = difference/35e+9)) +
+  geom_line(size = 1.2, color = "darkred") +
+  labs(x = "Year", y = "Damages per ton CO2 (USD)", title = "PER TON OF CO2") +
+  theme_minimal(14) +
+  theme(plot.title = element_text(hjust = 0.48, face = "bold"))
+
+p1 | p2
+p3 | p4
+
+```
+
+------------------------------------------------------------------------
+
+## 3. Social cost of carbon
+
+```{r}
+# creating a dataframe with discounted damages based on several discount rates
+scc <- pulse %>% 
+  mutate(years_into_future = year-2022) %>% 
+  mutate(scc_not_discounted = difference/35e+9) %>% 
+  mutate(dr0.25 = scc_not_discounted/(1.0025^years_into_future)) %>% 
+  mutate(dr0.5 = scc_not_discounted/(1.005^years_into_future)) %>% 
+  mutate(dr0.75 = scc_not_discounted/(1.0075^years_into_future)) %>% 
+  mutate(dr1 = scc_not_discounted/(1.01^years_into_future)) %>% 
+  mutate(dr2 = scc_not_discounted/(1.02^years_into_future)) %>% 
+  mutate(dr3 = scc_not_discounted/(1.03^years_into_future)) %>% 
+  mutate(dr4 = scc_not_discounted/(1.04^years_into_future)) %>% 
+  mutate(dr5 = scc_not_discounted/(1.05^years_into_future)) %>% 
+  mutate(dr6 = scc_not_discounted/(1.06^years_into_future)) %>% 
+  mutate(dr2.1 = scc_not_discounted/(1.021^years_into_future))
+  
+
+scc0.025 <- sum(scc$dr0.25)
+scc0.5 <- sum(scc$dr0.5)
+scc0.75 <- sum(scc$dr0.75)
+scc1 <- sum(scc$dr1)
+scc2 <- sum(scc$dr2)
+scc3 <- sum(scc$dr3)
+scc4 <- sum(scc$dr4)
+scc5 <- sum(scc$dr5)
+scc6 <- sum(scc$dr6)
+
+scc_vector <- c(scc0.025, scc0.5, scc0.75, scc1, scc2, scc3, scc4, scc5, scc6)
+dr <- c(0.25, 0.5, 0.75, 1, 2, 3, 4, 5, 6)
+scc_table <- data.frame(scc_vector, dr)
+
+# plotting SCC vs. discount rate
+ggplot(data = scc_table, aes(x = dr, y = scc_vector)) +
+    geom_line() +
+  geom_col(size = 3, fill = "firebrick") +
+  labs(x = "Discount rate (%)", y = "Social cost of carbon") +
+  theme_minimal(14) +
+  scale_x_continuous(n.breaks = 10) +
+  # geom_text(aes(x = dr, y = scc_vector, label = dr), nudge_y = 4) +
+  geom_text(aes(x = dr, y = scc_vector, label = paste("$", round(scc_vector, 0))), nudge_y = -11, angle = 90, color = "white ") +
+  geom_text(aes(x = 0.25, y = -3, label = ".25"), size = 3.2, color = "black") +
+  geom_text(aes(x = 0.5, y = -3, label = ".5"), size = 3.2, color = "black") +
+  geom_text(aes(x = 0.75, y = -3, label = ".75"), size = 3.2, color = "black")
+```
+
+**Figure 3** shows the social cost of carbon at several different plausible discount rates
+
+**Explanation:** As the discount rate increases, we place more value on near-term benefits and damages than future benefits and damages. The social cost of carbon reflects the price we assign to the future damages of one ton of carbon emissions. Thus, as the discount rate increases we will weigh future damages as less important, and the social cost of carbon will be lower.
+
+------------------------------------------------------------------------
+
+## 4. The Ramsey Rule
+
+```{r}
+# calculating the discount rate using the ramsey rule from the information given
+rr <- (0.001 + 2*0.01)*100
+```
+
+Using the Ramsey Rule, we find our discount rate to be **2.1%**
+
+```{r}
+# calculating the social cost of carbon using the ramsey rule
+scc2.1 <- sum(scc$dr2.1)
+
+
+# locating this discount rate on the graph
+ggplot(data = scc_table, aes(x = dr, y = scc_vector)) +
+    geom_line(alpha = 0.7) +
+  geom_col(size = 3, fill = "firebrick", alpha = 0.7) +
+  labs(x = "Discount rate (%)", y = "Social cost of carbon") +
+  theme_minimal(14) +
+  scale_x_continuous(n.breaks = 10) +
+  geom_point(aes(y = scc2.1, x = rr), size = 7, shape = 8) +
+  geom_text(aes(y = scc2.1, x = 4, label = "SCC = $71 at a discount rate of 2.1%"), size = 5, shape = 8)
+
+  
+```
+
+***
+
+## 5. Climate policies
+
+```{r}
+# creating a dataframe to calculate expected values
+policy <- pulse %>% 
+  mutate(warming_policy_a = 1.5*warming_baseline) %>% # 0.5 chance of this occurring under A
+  mutate(warming_policy_b = ifelse(year < 2050, warming_policy_a, 1.29)) # 100% chance of this occurring under B
+
+```
+
+
+Expected present value of damages up to 2100 under **Policy A**
+
+Expected present value of damages up to 2100 under **Policy B**
+
+
+Suppose undertaking Policy A
+costs zero and undertaking Policy B costs X. The total cost of a policy is the implementation
+cost plus expected damages. Make a plot of total cost of Policy A and total cost of Policy B
+against X. Suppose Congress wants to undertake the policy with the lower total cost. Use
+your graph to advise Congress.
+
+## 6. Risk aversion
