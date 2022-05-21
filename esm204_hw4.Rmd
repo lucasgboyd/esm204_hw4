@@ -1,6 +1,6 @@
 ---
 title: "ESM 204 - HW4"
-author: "Lucas Boyd"
+author: "Lucas Boyd & Max Settineri"
 date: "5/16/2022"
 output: 
   html_document:
