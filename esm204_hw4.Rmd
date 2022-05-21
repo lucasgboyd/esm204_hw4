@@ -70,25 +70,25 @@ pulse <- warming %>%
 # plotting
 p1 <- ggplot(data = pulse, aes(x = year, y = damages_baseline/1e+12)) +
   geom_line(size = 1.2, color = "darkred") +
-  labs(x = "Year", y = "Damages (trillions USD)", title = "DAMAGES UNDER BASELINE") +
+  labs(x = "Year", y = "Damages (trillions USD)", title = "Baseline damages") +
   theme_minimal(14) +
   theme(plot.title = element_text(hjust = 0.48, face = "bold"))
 
 p2 <- ggplot(data = pulse, aes(x = year, y = damages_pulse/1e+12)) +
   geom_line(size = 1.2, color = "darkred") +
-  labs(x = "Year", y = "Damages (trillions USD)", title = "DAMAGES WITH PULSE") +
+  labs(x = "Year", y = "Damages (trillions USD)", title = "Damages with pulse") +
   theme_minimal(14) +
   theme(plot.title = element_text(hjust = 0.48, face = "bold"))
 
 p3 <- ggplot(data = pulse, aes(x = year, y = difference/1e+09)) +
   geom_line(size = 1.2, color = "darkred") +
-  labs(x = "Year", y = "Damages (billions USD)", title = "ADDITIONAL DAMAGES FROM PULSE") +
+  labs(x = "Year", y = "Damages (billions USD)", title = "Additional damages from pulse") +
   theme_minimal(14) +
   theme(plot.title = element_text(hjust = 0.48, face = "bold"))
 
 p4 <- ggplot(data = pulse, aes(x = year, y = difference/35e+9)) +
   geom_line(size = 1.2, color = "darkred") +
-  labs(x = "Year", y = "Damages per ton CO2 (USD)", title = "PER TON OF CO2") +
+  labs(x = "Year", y = "Damages per ton CO2 (USD)", title = "Per ton of CO2") +
   theme_minimal(14) +
   theme(plot.title = element_text(hjust = 0.48, face = "bold"))
 
@@ -162,7 +162,7 @@ ggplot(data = scc_table, aes(x = dr, y = scc_vector)) +
 rr <- (0.001 + 2*0.01)*100
 ```
 
-Using the Ramsey Rule, we find our discount rate to be **2.1%**
+### Using the Ramsey Rule, we find our discount rate to be **2.1%**
 
 ```{r}
 # calculating the social cost of carbon using the ramsey rule
