@@ -18,9 +18,9 @@ library(tidyverse)
 library(here)
 library(broom)
 library(patchwork)
-```
 
-```{r}
+options(scipen = 999)
+
 # reading in damages data, creating new column for squared damages
 damages <- read_csv(here("damages.csv")) %>% 
   mutate(warming_q = warming^2)
@@ -29,7 +29,7 @@ damages <- read_csv(here("damages.csv")) %>%
 warming <- read_csv(here("warming.csv"))
 ```
 
-## 1.Quadratic model
+## 1. Quadratic model
 
 ```{r}
 # creating a quadratic model
@@ -110,6 +110,7 @@ scc <- pulse %>%
   mutate(dr0.5 = scc_not_discounted/(1.005^years_into_future)) %>% 
   mutate(dr0.75 = scc_not_discounted/(1.0075^years_into_future)) %>% 
   mutate(dr1 = scc_not_discounted/(1.01^years_into_future)) %>% 
+  mutate(dr1.5 = scc_not_discounted/(1.015^years_into_future)) %>% 
   mutate(dr2 = scc_not_discounted/(1.02^years_into_future)) %>% 
   mutate(dr3 = scc_not_discounted/(1.03^years_into_future)) %>% 
   mutate(dr4 = scc_not_discounted/(1.04^years_into_future)) %>% 
@@ -122,28 +123,30 @@ scc0.025 <- sum(scc$dr0.25)
 scc0.5 <- sum(scc$dr0.5)
 scc0.75 <- sum(scc$dr0.75)
 scc1 <- sum(scc$dr1)
+scc1.5 <- sum(scc$dr1.5)
 scc2 <- sum(scc$dr2)
 scc3 <- sum(scc$dr3)
 scc4 <- sum(scc$dr4)
 scc5 <- sum(scc$dr5)
 scc6 <- sum(scc$dr6)
 
-scc_vector <- c(scc0.025, scc0.5, scc0.75, scc1, scc2, scc3, scc4, scc5, scc6)
-dr <- c(0.25, 0.5, 0.75, 1, 2, 3, 4, 5, 6)
+scc_vector <- c(scc0.025, scc0.5, scc0.75, scc1, scc1.5, scc2, scc3, scc4, scc5, scc6)
+dr <- c(0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 5, 6)
 scc_table <- data.frame(scc_vector, dr)
 
 # plotting SCC vs. discount rate
 ggplot(data = scc_table, aes(x = dr, y = scc_vector)) +
     geom_line() +
-  geom_col(size = 3, fill = "firebrick") +
+  geom_col(size = 3, fill = "darkred") +
   labs(x = "Discount rate (%)", y = "Social cost of carbon") +
   theme_minimal(14) +
   scale_x_continuous(n.breaks = 10) +
   # geom_text(aes(x = dr, y = scc_vector, label = dr), nudge_y = 4) +
   geom_text(aes(x = dr, y = scc_vector, label = paste("$", round(scc_vector, 0))), nudge_y = -11, angle = 90, color = "white ") +
-  geom_text(aes(x = 0.25, y = -3, label = ".25"), size = 3.2, color = "black") +
-  geom_text(aes(x = 0.5, y = -3, label = ".5"), size = 3.2, color = "black") +
-  geom_text(aes(x = 0.75, y = -3, label = ".75"), size = 3.2, color = "black")
+  geom_text(aes(x = 0.25, y = -3, label = ".25"), size = 3.2, color = "grey28") +
+  geom_text(aes(x = 0.5, y = -3, label = ".5"), size = 3.2, color = "grey28") +
+  geom_text(aes(x = 0.75, y = -3, label = ".75"), size = 3.2, color = "grey28") +
+  geom_text(aes(x = 1.5, y = -3, label = "1.5"), size = 3.2, color = "grey28")
 ```
 
 **Figure 3** shows the social cost of carbon at several different plausible discount rates
@@ -169,7 +172,7 @@ scc2.1 <- sum(scc$dr2.1)
 # locating this discount rate on the graph
 ggplot(data = scc_table, aes(x = dr, y = scc_vector)) +
     geom_line(alpha = 0.7) +
-  geom_col(size = 3, fill = "firebrick", alpha = 0.7) +
+  geom_col(size = 3, fill = "darkred", alpha = 0.7) +
   labs(x = "Discount rate (%)", y = "Social cost of carbon") +
   theme_minimal(14) +
   scale_x_continuous(n.breaks = 10) +
@@ -187,20 +190,53 @@ ggplot(data = scc_table, aes(x = dr, y = scc_vector)) +
 # creating a dataframe to calculate expected values
 policy <- pulse %>% 
   mutate(warming_policy_a = 1.5*warming_baseline) %>% # 0.5 chance of this occurring under A
-  mutate(warming_policy_b = ifelse(year < 2050, warming_policy_a, 1.29)) # 100% chance of this occurring under B
+  mutate(warming_policy_b = ifelse(year < 2050, warming_policy_a, 1.29)) %>% # 100% chance of this occurring under B
+  mutate(damages_a = damages(warming_policy_a)) %>% 
+  mutate(damages_b = damages(warming_policy_b)) %>%
+  mutate(years_into_future = year-2022) %>% 
+  mutate(damages_a_discounted = damages_a/(1.02^years_into_future)) %>%
+  mutate(damages_b_discounted = damages_b/(1.02^years_into_future)) %>% 
+  mutate(damages_baseline_discounted = damages_baseline/(1.02^years_into_future))
+
+# expected values
+ev_a <- 0.5*sum(policy$damages_baseline_discounted) + 0.5*sum(policy$damages_a_discounted)
+ev_b <- sum(policy$damages_b_discounted)
 
 ```
 
+### Damages under each policy 
+Expected present value of damages up to 2100 under **Policy A**: $`r round(ev_a/1e+12, 0)` trillion
 
-Expected present value of damages up to 2100 under **Policy A**
+Expected present value of damages up to 2100 under **Policy B**: $`r round(ev_b/1e+12, 0)` trillion
 
-Expected present value of damages up to 2100 under **Policy B**
+```{r}
+# sequence for cost
+cost <- seq(0, 5e15, by = 1e12) 
 
+cost_df <- data.frame(cost) 
 
-Suppose undertaking Policy A
-costs zero and undertaking Policy B costs X. The total cost of a policy is the implementation
-cost plus expected damages. Make a plot of total cost of Policy A and total cost of Policy B
-against X. Suppose Congress wants to undertake the policy with the lower total cost. Use
-your graph to advise Congress.
+cost_compare <- cost_df %>% 
+  mutate(cost_b = ev_b + cost) %>% 
+  mutate(cost_a = ev_a)
+
+# visualizing cost and damages of policy options
+ggplot(data = cost_compare) +
+  geom_line(aes(x = cost/1e12, y = cost_a/1e12), size = 1.2, color = "darkred") + 
+  geom_line(aes(x = cost/1e12, y = cost_b/1e12), size = 1.2, color = "cyan4") +
+  theme_minimal(14) + 
+  labs(x = "Cost to implement policy (trillions USD)", y = "Expected value of total cost (trillions USD)") +
+  geom_text(aes(x = 4000, y = 3200, label = "Policy A"), color = "firebrick", size = 4) +
+  geom_text(aes(x = 4000, y = 5300, label = "Policy B"), color = "cyan4", angle = 32, size = 4) +
+  geom_vline(xintercept = 1970, linetype = "dashed", size = 1.2) +
+  geom_text(aes(x = 1000, y = 6000, label = "Enact Policy B"), size = 4) +
+  geom_text(aes(x = 3400, y = 6000, label = "Enact Policy A"), size = 4) +
+  scale_y_continuous(limits = c(0, 6000))
+```
+
+**Advice to Congress:** Based on the plot above, Congress should enact Policy B if it costs less than ~$2000 trillion to implement. At any price below that, the total expected value of the cost Policy B (damages + cost to implement) is less than the total expected value of the cost of Policy A (damages). Since society is risk neutral, the expected utility is equal to the expected value. Given that every climate policy ever proposed has been many magnitudes below this number, I'd say it's probably time for congress to enact some climate policy. 
+
+***
 
 ## 6. Risk aversion
+
+If society is risk averse, congress will be more likely to enact Policy B. They will take the more conservative approach.
